@@ -1,6 +1,6 @@
 {
   "name": "v-file-input",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Simple file input component for Vue.js",
   "author": "shrpne <shrpne@gmail.com>",
   "main": "dist/v-file-input.common.js",

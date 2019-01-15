@@ -181,7 +181,7 @@
                         // resize file if needed
                         let dimensionPromise = new Promise((resolveDimension) => {
                             if (file.type.match('image.*') && (this.maxWidth || this.maxHeight)) {
-                                this.resizeImage(file)
+                                resizeImage(file, this.maxWidth, this.maxHeight)
                                     .then(resolveDimension);
                             } else {
                                 resolveDimension(file);
@@ -229,38 +229,6 @@
                     reader.readAsDataURL(file);
                 });
             },
-            //@TODO consider using better resizing algorithm https://stackoverflow.com/a/24775332/4936667
-            resizeImage(file) {
-                return new Promise((resolve) => {
-                    let img = new Image;
-                    let url = URL.createObjectURL(file);
-                    img.onload = () => {
-                        URL.revokeObjectURL(url);
-                        let width = img.width;
-                        let height = img.height;
-
-                        if (width > height) {
-                            if (width > this.maxWidth) {
-                                height *= this.maxWidth / width;
-                                width = this.maxWidth;
-                            }
-                        } else {
-                            if (height > this.maxHeight) {
-                                width *= this.maxHeight / height;
-                                height = this.maxHeight;
-                            }
-                        }
-                        let canvas = document.createElement("canvas");
-                        canvas.width = width;
-                        canvas.height = height;
-                        let ctx = canvas.getContext("2d");
-                        ctx.drawImage(img, 0, 0, width, height);
-
-                        canvas.toBlob(resolve, file.type);
-                    };
-                    img.src = url;
-                });
-            },
             /**
              * Проверяет, что файл соответствует принимаемым mime-type'ам
              * @TODO нет проверки на расширение файла
@@ -276,6 +244,124 @@
             },
         }
     };
+
+    /**
+     * Resize File to given dimensions
+     * @TODO consider using better resizing algorithm https://stackoverflow.com/a/24775332/4936667 or https://github.com/nodeca/pica
+     * @param {File|Blob} file
+     * @param {number} maxWidth
+     * @param {number} maxHeight
+     * @return {Promise<Blob>}
+     */
+    function resizeImage(file, maxWidth, maxHeight) {
+        return new Promise((resolve) => {
+            let img = new Image;
+            let url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height *= maxWidth / width;
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width *= maxHeight / height;
+                        height = maxHeight;
+                    }
+                }
+                let canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                let ctx = canvas.getContext("2d");
+
+                getOrientation(file, (orientation) => {
+                    drawImage(canvas, ctx, img, width, height, orientation);
+                    canvas.toBlob(resolve, file.type);
+                });
+
+            };
+            img.src = url;
+        });
+    }
+
+    /**
+     * Draw image on canvas according to EXIF orientation data
+     * https://stackoverflow.com/a/40867559/4936667
+     */
+    function drawImage(canvas, ctx, img, width, height, orientation) {
+        // set proper canvas dimensions before transform & export
+        if (4 < orientation && orientation < 9) {
+            // 5-8
+            canvas.width = height;
+            canvas.height = width;
+        } else {
+            // 1-4
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        // transform context before drawing image
+        switch (orientation) {
+            case 2: ctx.transform(-1, 0, 0, 1, width, 0); break;
+            case 3: ctx.transform(-1, 0, 0, -1, width, height); break;
+            case 4: ctx.transform(1, 0, 0, -1, 0, height); break;
+            case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
+            case 6: ctx.transform(0, 1, -1, 0, height, 0); break;
+            case 7: ctx.transform(0, -1, -1, 0, height, width); break;
+            case 8: ctx.transform(0, -1, 1, 0, 0, width); break;
+        }
+
+        // draw image
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    }
+
+
+    /**
+     * https://stackoverflow.com/a/32490603/4936667
+     * @param {File|Blob} file
+     * @param {Function<number>} callback
+     */
+    function getOrientation(file, callback) {
+        let reader = new FileReader();
+        reader.onload = function (e) {
+
+            let view = new DataView(e.target.result);
+            if (view.getUint16(0, false) !== 0xFFD8) {
+                return callback(-2);
+            }
+            let length = view.byteLength, offset = 2;
+            while (offset < length) {
+                if (view.getUint16(offset + 2, false) <= 8) return callback(-1);
+                let marker = view.getUint16(offset, false);
+                offset += 2;
+                if (marker === 0xFFE1) {
+                    if (view.getUint32(offset += 2, false) !== 0x45786966) {
+                        return callback(-1);
+                    }
+
+                    let little = view.getUint16(offset += 6, false) === 0x4949;
+                    offset += view.getUint32(offset + 4, little);
+                    let tags = view.getUint16(offset, little);
+                    offset += 2;
+                    for (let i = 0; i < tags; i++) {
+                        if (view.getUint16(offset + (i * 12), little) === 0x0112) {
+                            return callback(view.getUint16(offset + (i * 12) + 8, little));
+                        }
+                    }
+                } else if ((marker & 0xFF00) !== 0xFF00) {
+                    break;
+                } else {
+                    offset += view.getUint16(offset, false);
+                }
+            }
+            return callback(-1);
+        };
+        reader.readAsArrayBuffer(file);
+    }
 </script>
 
 <template>

@@ -45,7 +45,7 @@ module.exports = {
   ],
   // add your custom rules here
   'rules': {
-    //"indent": ["error", 4, { "SwitchCase": 1 }],
+    // "indent": ["error", 4, { "SwitchCase": 1 }],
     semi: ["error", "always", { "omitLastInOneLineBlock": false}],
     // allow async-await
     'generator-star-spacing': 0,
@@ -54,7 +54,7 @@ module.exports = {
     // vue
     "vue/script-indent": ["error", 4, {
       "baseIndent": 1,
-      "switchCase": 0,
+      "switchCase": 1,
       "ignores": []
     }],
   },
