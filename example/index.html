@@ -1,0 +1,118 @@
+<html lang="en">
+<head>
+    <title>v-file-input example</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://unpkg.com/v-file-input"></script>
+    <!--<script src="../dist/v-file-input.js"></script>-->
+</head>
+<body>
+
+<div id="app">
+    <form class="proof" v-show="!fileApiError">
+        <div class="proof-image" v-for="image in images" :key="image.id" :style="{backgroundImage: `url('${image.dataUrl}')`}">
+            <button class="proof-image-remove u-semantic-button" type="button" @click="removeImage(image.id)">Delete</button>
+        </div>
+        <label class="proof-file-label" v-show="allowAddImages">
+            <file-input
+                :multiple="true"
+                :disabled="isFormSending"
+                :max-width="200"
+                :max-height="200"
+                @on-add="addImages"
+                @on-error="fileApiError = true"
+                @on-drag-start="isDragLayerVisible = true"
+                @on-drag-end="isDragLayerVisible = false"
+            ></file-input>
+        </label>
+    </form>
+    <div class="input__help input__help--form input__help--error" v-if="fileError" v-text="fileError"></div>
+    <div class="input__help input__help--form input__help--error" v-if="fileApiError">Your browser doesn't support File API</div>
+
+    <modal :is-open.sync="isDragLayerVisible"></modal>
+</div>
+
+<script>
+    /* Some modal component */
+    var modal = {
+        props: {
+            isOpen: {
+                type: Boolean,
+                default: false,
+            },
+        },
+        template: '<transition name="v-transition-modal">\n' +
+            '        <div class="modal file-input__drag-layer" tabindex="-1" role="dialog" v-if="isOpen">\n' +
+            '            <div class="modal__wrap">\n' +
+            '                <div class="modal__container file-input__drag-layer-container">\n' +
+            '                    Drop image anywhere to upload\n' +
+            '                </div>\n' +
+            '            </div>\n' +
+            '        </div>\n' +
+            '    </transition>'
+    }
+</script>
+
+<script>
+    Vue.component('modal', modal);
+    Vue.use(VFileInput);
+
+    const MAX_IMAGES_COUNT = 6;
+    const MAX_IMAGES_SIZE = 10; // MB
+
+    var app = new Vue({
+        el: '#app',
+        data: {
+            images: [],
+            isFormSending: false,
+            fileError: false,
+            fileApiError: false,
+            isDragLayerVisible: false,
+        },
+        computed: {
+            allowAddImages() {
+                return this.images.length < MAX_IMAGES_COUNT;
+            }
+        },
+        methods: {
+            /**
+             * @param {array} files
+             * @param {number} files[id] - unique file number
+             * @param {string} files[dataUrl] - base64 encoded content
+             * @param {number} files[size] - file size in bytes
+             */
+            addImages(files) {
+                // check images count
+                if (this.images.length + files.length > MAX_IMAGES_COUNT) {
+                    this.fileError = `Can't attach more that ${MAX_IMAGES_COUNT} images`;
+                    return;
+                }
+                // check images size
+                let totalSize = 0;
+                this.images.forEach(function (item) {
+                    totalSize += item.size;
+                });
+                files.forEach(function (item) {
+                    totalSize += item.size;
+                });
+                if (totalSize > MAX_IMAGES_SIZE * 1024 * 1024) {
+                    this.fileError = `Max file size mustn't exceed ${MAX_IMAGES_SIZE} MB`;
+                    return;
+                }
+                // добавление файлов
+                this.images = this.images.concat(files);
+            },
+            removeImage(fileId) {
+                this.images.some((item, index) => {
+                    if (item.id === fileId) {
+                        this.images.splice(index, 1);
+                        return true;
+                    }
+                });
+            },
+        }
+    });
+</script>
+</body>
+</html>

@@ -12,7 +12,7 @@ npm install --save v-file-input
 
 ## Usage
 
-### Bundler (Webpack, Rollup)
+### Init with bundler (Webpack, Rollup)
 
 ```js
 // As plugin
@@ -24,7 +24,7 @@ Vue.use(VFileInput)
 // As component
 ```
 
-### Browser
+### Init in browser
 
 ```html
 <!-- Include after Vue -->
@@ -36,6 +36,23 @@ Vue.use(VFileInput)
 <!-- From CDN -->
 <script src="https://unpkg.com/v-file-input"></script>
 ```
+
+### Example
+
+```html
+<file-input
+    :multiple="true"
+    :disabled="false"
+    :max-width="200"
+    :max-height="200"
+    @on-add="addFiles"
+    @on-error="showFileApiError"
+    @on-drag-start="showDragNotice"
+    @on-drag-end="hideDragNotice"
+></file-input>
+```
+
+[Full example](https://github.com/shrpne/v-file-input/blob/master/example/index.html)
 
 ## Development
 

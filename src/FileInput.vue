@@ -1,11 +1,12 @@
 <script>
+    import 'mdn-canvas-to-blob';
     import throttle from 'lodash-es/throttle';
 
     // emitted events
-    const EVENT_DRAG_START = 'onDragStart';
-    const EVENT_DRAG_END = 'onDragEnd';
-    const EVENT_ADD = 'onAdd';
-    const EVENT_ERROR = 'onError';
+    const EVENT_DRAG_START = 'on-drag-start';
+    const EVENT_DRAG_END = 'on-drag-end';
+    const EVENT_ADD = 'on-add';
+    const EVENT_ERROR = 'on-error';
 
     let fileId = 0;
     let isDragOver = false;
@@ -23,6 +24,12 @@
             },
             accept: {
                 type: String,
+            },
+            maxWidth: {
+                type: Number,
+            },
+            maxHeight: {
+                type: Number,
             },
         },
         data() {
@@ -53,7 +60,6 @@
                     } else if (!isDragOver && isDragOverEmitted) {
                         this.$emit(EVENT_DRAG_END);
                         isDragOverEmitted = false;
-
                     }
                 }, 50);
             },
@@ -163,7 +169,7 @@
              */
             processFiles(fileList) {
                 let count = this.multiple ? fileList.length : 1;
-                let readPromises = [];
+                let filePromiseList = [];
                 let result = [];
                 // чтение каждого файла
                 for(let i = 0; i < count; i++) {
@@ -171,37 +177,88 @@
                     if (!this.isAcceptedFile(file)) {
                         continue;
                     }
-                    let readPromise = this.readData(file).then((dataUrl) => {
-                        result[i] = {
-                            id: fileId,
-                            dataUrl,
-                            name: file.name,
-                            size: file.size,
-                            blob: file,
-                        };
-                        fileId++;
+                    let filePromise = new Promise((resolve) => {
+                        // resize file if needed
+                        let dimensionPromise = new Promise((resolveDimension) => {
+                            if (file.type.match('image.*') && (this.maxWidth || this.maxHeight)) {
+                                this.resizeImage(file)
+                                    .then(resolveDimension);
+                            } else {
+                                resolveDimension(file);
+                            }
+                        });
+
+                        // file have acceptable dimensions
+                        dimensionPromise.then((file) => {
+                            this.getDataUrlFromBlob(file).then((dataUrl) => {
+                                result[i] = {
+                                    id: fileId,
+                                    dataUrl,
+                                    name: file.name,
+                                    size: file.size,
+                                    type: file.type,
+                                    blob: file,
+                                };
+                                fileId++;
+                                resolve();
+                            });
+                        });
                     });
-                    readPromises.push(readPromise);
+
+                    filePromiseList.push(filePromise);
                 }
-                if (!readPromises.length) {
+                if (!filePromiseList.length) {
                     return;
                 }
-                Promise.all(readPromises).then(() => {
+                Promise.all(filePromiseList).then(() => {
                     // передача файлов наверх
                     this.$emit(EVENT_ADD, result);
                 });
             },
             /**
+             * @TODO consider not exposing data url for performance purpose. Users will have to use FileReader or URL.createObjectURL() (https://twitter.com/andrey_sitnik/status/1060157747189170176)
              * @param {File|Blob} file
              * @return {Promise<string>} - promise resolves with dataURL
              */
-            readData(file) {
+            getDataUrlFromBlob(file) {
                 return new Promise((resolve) => {
                     let reader = new FileReader();
                     reader.onload = (event) => {
                         resolve(event.target.result);
                     };
                     reader.readAsDataURL(file);
+                });
+            },
+            //@TODO consider using better resizing algorithm https://stackoverflow.com/a/24775332/4936667
+            resizeImage(file) {
+                return new Promise((resolve) => {
+                    let img = new Image;
+                    let url = URL.createObjectURL(file);
+                    img.onload = () => {
+                        URL.revokeObjectURL(url);
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > this.maxWidth) {
+                                height *= this.maxWidth / width;
+                                width = this.maxWidth;
+                            }
+                        } else {
+                            if (height > this.maxHeight) {
+                                width *= this.maxHeight / height;
+                                height = this.maxHeight;
+                            }
+                        }
+                        let canvas = document.createElement("canvas");
+                        canvas.width = width;
+                        canvas.height = height;
+                        let ctx = canvas.getContext("2d");
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob(resolve, file.type);
+                    };
+                    img.src = url;
                 });
             },
             /**
