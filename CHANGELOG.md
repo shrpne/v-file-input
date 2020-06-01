@@ -1,3 +1,6 @@
+## 0.1.2 - 2020-06-01
+- Fix: resize ans rotate combination when max width/height applies
+
 ## 0.1.1 - 2019-01-15
 - Fix: on resizing apply proper rotation based on EXIF orientation data
 

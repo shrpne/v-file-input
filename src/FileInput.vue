@@ -262,24 +262,26 @@
                 let width = img.width;
                 let height = img.height;
 
+                let scale = 1;
                 if (width > height) {
                     if (width > maxWidth) {
-                        height *= maxWidth / width;
-                        width = maxWidth;
+                        scale = maxWidth / width;
                     }
                 } else {
                     if (height > maxHeight) {
-                        width *= maxHeight / height;
-                        height = maxHeight;
+                        scale = maxHeight / height;
                     }
                 }
+                if (scale === 1) {
+                    resolve(file);
+                    return;
+                }
+
                 let canvas = document.createElement("canvas");
-                canvas.width = width;
-                canvas.height = height;
                 let ctx = canvas.getContext("2d");
 
                 getOrientation(file, (orientation) => {
-                    drawImage(canvas, ctx, img, width, height, orientation);
+                    drawImage(canvas, ctx, img, width, height, orientation, scale);
                     canvas.toBlob(resolve, file.type);
                 });
 
@@ -292,19 +294,20 @@
      * Draw image on canvas according to EXIF orientation data
      * https://stackoverflow.com/a/40867559/4936667
      */
-    function drawImage(canvas, ctx, img, width, height, orientation) {
+    function drawImage(canvas, ctx, img, width, height, orientation, scale) {
         // set proper canvas dimensions before transform & export
         if (4 < orientation && orientation < 9) {
             // 5-8
-            canvas.width = height;
-            canvas.height = width;
+            canvas.width = height * scale;
+            canvas.height = width * scale;
         } else {
             // 1-4
-            canvas.width = width;
-            canvas.height = height;
+            canvas.width = width * scale;
+            canvas.height = height * scale;
         }
 
         // transform context before drawing image
+        ctx.scale(scale, scale);
         switch (orientation) {
             case 2: ctx.transform(-1, 0, 0, 1, width, 0); break;
             case 3: ctx.transform(-1, 0, 0, -1, width, height); break;
@@ -316,7 +319,7 @@
         }
 
         // draw image
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
     }
 
 
