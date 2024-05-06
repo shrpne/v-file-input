@@ -13,6 +13,7 @@
     let isDragOverEmitted = false;
 
     export default {
+        name: 'FileInput',
         props: {
             multiple: {
                 type: Boolean,
@@ -32,6 +33,12 @@
                 type: Number,
             },
         },
+        emits: [
+            EVENT_DRAG_START,
+            EVENT_DRAG_END,
+            EVENT_ADD,
+            EVENT_ERROR,
+        ],
         data() {
             return {
                 fileApiError: false,
@@ -164,6 +171,15 @@
             preventPageReload(e) {
                 e.preventDefault();
             },
+            /**
+             * @typedef {object} FileData
+             * @property {number} id - unique file id
+             * @property {string} dataUrl - file data url
+             * @property {string} name - file name
+             * @property {number} size - file size
+             * @property {string} type - file mime-type
+             * @property {Blob} blob - file blob
+             */
             /**
              * @param {FileList} fileList
              */
