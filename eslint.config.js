@@ -56,7 +56,6 @@ const config = [
             'no-plusplus': ['error', { allowForLoopAfterthoughts: true }],
             // allow let
             'prefer-const': 'off',
-            'prefer-destructuring': ['error', { object: true, array: false }],
             // allow extension in imports
             'import/extensions': 'off',
             'prefer-object-spread': 'off',
@@ -65,22 +64,22 @@ const config = [
             '@typescript-eslint/no-unused-vars': 'off',
 
 
-            // "vue/script-indent": ["error", 4, {
-            //     "baseIndent": 1,
-            //     "switchCase": 1,
-            //     "ignores": [],
-            // }],
             'vue/html-closing-bracket-spacing': 0,
             'vue/html-indent': ['error', 4],
             'vue/no-v-html': 0,
         },
     },
-    {
-        files: ['*.vue', '**/*.vue'],
-        rules: {
-            indent: 0,
-        },
-    },
+    // {
+    //     files: ['*.vue', '**/*.vue'],
+    //     rules: {
+    //         indent: 0,
+    //         "vue/script-indent": ["error", 4, {
+    //             "baseIndent": 0,
+    //             "switchCase": 1,
+    //             "ignores": [],
+    //         }],
+    //     },
+    // },
 ];
 
 export default config;

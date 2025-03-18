@@ -24,14 +24,9 @@
     "prepublishOnly": "npm run test && npm run emit-dts && npm run build",
     "precommit": "echo 'Pre-commit checks...' && npm run lint"
   },
-  "lint-staged": {
-    "*.{vue,jsx,js}": [
-      "eslint --fix"
-    ]
-  },
   "pre-commit": "precommit",
   "dependencies": {
-    "lodash-es": "^4.17.21",
+    "es-toolkit": "^1.33.0",
     "mdn-canvas-to-blob": "^1.0.1"
   },
   "devDependencies": {
