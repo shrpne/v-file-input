@@ -1,0 +1,42 @@
+{
+  // from @https://typescript.nuxtjs.org/guide/setup/#configuration
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "skipLibCheck": true,
+    "lib": [
+      "ESNext",
+      "ESNext.AsyncIterable",
+      "DOM",
+      "DOM.Iterable",
+    ],
+    "esModuleInterop": true,
+    "allowJs": true,
+    "checkJs": true,
+//    "sourceMap": true,
+    "strict": false,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "declaration": true,
+    "declarationDir": "./types",
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "~/*": [
+        "./*"
+      ],
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "types/**/*"
+  ]
+}

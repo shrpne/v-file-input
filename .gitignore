@@ -2,6 +2,7 @@ node_modules/
 
 test/coverage
 dist
+types/
 reports
 
 package-lock.json
