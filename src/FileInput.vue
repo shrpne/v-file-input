@@ -1,252 +1,253 @@
-<script>
+<script setup>
+import { ref, computed, onBeforeMount, onMounted, onUnmounted } from 'vue';
 import 'mdn-canvas-to-blob';
-import { throttle} from 'es-toolkit';
+import { throttle } from 'es-toolkit';
 
-// emitted events
-const EVENT_DRAG_START = 'on-drag-start';
-const EVENT_DRAG_END = 'on-drag-end';
-const EVENT_ADD = 'on-add';
-const EVENT_ERROR = 'on-error';
 
 let fileId = 0;
 let isDragOver = false;
 let isDragOverEmitted = false;
 
-export default {
-    name: 'FileInput',
-    props: {
-        multiple: {
-            type: Boolean,
-            default: false,
-        },
-        disabled: {
-            type: Boolean,
-            default: false,
-        },
-        accept: {
-            type: String,
-        },
-        maxWidth: {
-            type: Number,
-        },
-        maxHeight: {
-            type: Number,
-        },
+const props = defineProps({
+    multiple: {
+        type: Boolean,
+        default: false,
     },
-    emits: [
-        EVENT_DRAG_START,
-        EVENT_DRAG_END,
-        EVENT_ADD,
-        EVENT_ERROR,
-    ],
-    data() {
-        return {
-            fileApiError: false,
+    disabled: {
+        type: Boolean,
+        default: false,
+    },
+    accept: {
+        type: String,
+    },
+    maxWidth: {
+        type: Number,
+    },
+    maxHeight: {
+        type: Number,
+    },
+});
+
+const emit = defineEmits([
+    'drag-start',
+    'drag-end',
+    'add',
+    'error',
+]);
+
+const fileApiError = ref(false);
+
+/**
+ * @returns {Array<string>} - array of mime-types suitable substring check
+ */
+const acceptedTypes = computed(() => {
+    if (typeof props.accept !== 'string') {
+        return [];
+    }
+    let types = props.accept.split(',');
+    return types
+        // 'image/*' => 'image'
+        .map((type) => type.replace('/*', '').trim())
+        .filter((type) => !!type.length);
+});
+
+const emitDragState = computed(() => {
+    return throttle(() => {
+        if (isDragOver && !isDragOverEmitted && !props.disabled) {
+            emit('drag-start');
+            isDragOverEmitted = true;
+        } else if (!isDragOver && isDragOverEmitted) {
+            emit('drag-end');
+            isDragOverEmitted = false;
+        }
+    }, 50);
+});
+
+onBeforeMount(() => {
+    if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
+        emit('error');
+        fileApiError.value = true;
+    }
+});
+
+onMounted(() => {
+    if (fileApiError.value) {
+        return;
+    }
+
+    // предотвращение замены страницы картинкой
+    addEvents(['dragover', 'drop'], preventPageReload);
+
+    // drop на все окно
+    window.addEventListener('drop', onDrop);
+    // paste на окно
+    window.addEventListener('paste', onPaste);
+
+    // уведомление о drag на все окно
+    addEvents(['dragenter', 'dragover'], onDragEnter);
+    addEvents(['dragleave', 'dragend', 'drop'], onDragLeave);
+
+    /**
+     * Add event listeners to array of events
+     * @param {Array<string>} events
+     * @param {Function} callback
+     */
+    function addEvents(events, callback) {
+        events.forEach((eventName) => {
+            window.addEventListener(eventName, callback);
+        });
+    }
+});
+
+onUnmounted(() => {
+    if (fileApiError.value) {
+        return;
+    }
+
+    removeEvents(['dragover', 'drop'], preventPageReload);
+    window.removeEventListener('drop', onDrop);
+    window.removeEventListener('paste', onPaste);
+    removeEvents(['dragenter', 'dragover'], onDragEnter);
+    removeEvents(['dragleave', 'dragend', 'drop'], onDragLeave);
+
+    /**
+     * Remove event listeners from array of events
+     * @param {Array<string>} events
+     * @param {Function} callback
+     */
+    function removeEvents(events, callback) {
+        events.forEach((eventName) => {
+            window.removeEventListener(eventName, callback);
+        });
+    }
+});
+
+
+function onChange(e) {
+    if (fileApiError.value || props.disabled) {
+        return;
+    }
+    e.preventDefault();
+    processFiles(e.target.files);
+}
+
+function onDrop(e) {
+    //@TODO drop folder @see https://github.com/lian-yue/vue-upload-component/blob/master/src/FileUpload.vue
+    if (props.disabled) {
+        return;
+    }
+    if (e.dataTransfer.files.length) {
+        processFiles(e.dataTransfer.files);
+    }
+}
+
+function onPaste(e) {
+    if (props.disabled) {
+        return;
+    }
+    /** @type {Array<File>} */
+    let files = [];
+    for (let index in e.clipboardData.items) {
+        let item = e.clipboardData.items[index];
+        if (item.kind === 'file') {
+            files.push(item.getAsFile());
+        }
+    }
+    if (files.length) {
+        processFiles(files);
+    }
+}
+
+function onDragEnter() {
+    isDragOver = true;
+    emitDragState.value();
+}
+
+function onDragLeave() {
+    isDragOver = false;
+    emitDragState.value();
+}
+
+function preventPageReload(e) {
+    e.preventDefault();
+}
+
+/**
+ * @typedef {object} FileData
+ * @property {number} id - unique file id
+ * @property {string} dataUrl - file data url
+ * @property {string} name - file name
+ * @property {number} size - file size
+ * @property {string} type - file mime-type
+ * @property {Blob} blob - file blob
+ */
+/**
+ * @param {FileList|Array<File>} fileList
+ */
+async function processFiles(fileList) {
+    let count = props.multiple ? fileList.length : 1;
+    /**
+     * @type {Array<FileData>}
+     */
+    let result = [];
+    // чтение каждого файла
+    for (let i = 0; i < count; i++) {
+        let file = fileList[i];
+        if (!isAcceptedFile(file)) {
+            continue;
+        }
+        // resize file if needed
+        if (file.type.match('image.*') && (props.maxWidth || props.maxHeight)) {
+            file = await resizeImage(file, props.maxWidth, props.maxHeight);
+        }
+
+        // file have acceptable dimensions
+        const dataUrl = await getDataUrlFromBlob(file);
+        result[i] = {
+            id: fileId,
+            dataUrl,
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            blob: file,
         };
-    },
-    computed: {
-        /**
-         * @returns {Array<string>} - array of mime-types suitable substring check
-         */
-        acceptedTypes() {
-            if (typeof this.accept !== 'string') {
-                return [];
-            }
-            let types = this.accept.split(',');
-            return types
-                // 'image/*' => 'image'
-                .map((type) => type.replace('/*', '').trim())
-                .filter((type) => !!type.length);
-        },
-        emitDragState() {
-            return throttle(() => {
-                if (isDragOver && !isDragOverEmitted && !this.disabled) {
-                    this.$emit(EVENT_DRAG_START);
-                    isDragOverEmitted = true;
+        fileId += 1;
+    }
+    if (!result.length) {
+        return;
+    }
+    // передача файлов наверх
+    emit('add', result);
+}
 
-                } else if (!isDragOver && isDragOverEmitted) {
-                    this.$emit(EVENT_DRAG_END);
-                    isDragOverEmitted = false;
-                }
-            }, 50);
-        },
-    },
-    beforeMount() {
-        if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
-            this.$emit(EVENT_ERROR);
-            this.fileApiError = true;
-        }
-    },
-    mounted() {
-        if (this.fileApiError) {
-            return;
-        }
+/**
+ * @TODO consider not exposing data url for performance purpose. Users will have to use FileReader or URL.createObjectURL() (https://twitter.com/andrey_sitnik/status/1060157747189170176)
+ * @param {File|Blob} file
+ * @return {Promise<string>} - promise resolves with dataURL
+ */
+function getDataUrlFromBlob(file) {
+    return new Promise((resolve) => {
+        let reader = new FileReader();
+        reader.onload = (event) => {
+            resolve(event.target.result);
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
-        // предотвращение замены страницы картинкой
-        addEvents(['dragover', 'drop'], this.preventPageReload);
-
-        // drop на все окно
-        window.addEventListener('drop', this.onDrop);
-        // paste на окно
-        window.addEventListener('paste', this.onPaste);
-
-        // уведомление о drag на все окно
-        addEvents(['dragenter', 'dragover'], this.onDragEnter);
-        addEvents(['dragleave', 'dragend', 'drop'], this.onDragLeave);
-
-        /**
-         * Add event listeners to array of events
-         * @param {Array<string>} events
-         * @param {Function} callback
-         */
-        function addEvents(events, callback) {
-            events.forEach((eventName) => {
-                window.addEventListener(eventName, callback);
-            });
-        }
-    },
-    unmounted() {
-        if (this.fileApiError) {
-            return;
-        }
-
-        removeEvents(['dragover', 'drop'], this.preventPageReload);
-        window.removeEventListener('drop', this.onDrop);
-        window.removeEventListener('paste', this.onPaste);
-        removeEvents(['dragenter', 'dragover'], this.onDragEnter);
-        removeEvents(['dragleave', 'dragend', 'drop'], this.onDragLeave);
-
-        /**
-         * Remove event listeners from array of events
-         * @param {Array<string>} events
-         * @param {Function} callback
-         */
-        function removeEvents(events, callback) {
-            events.forEach((eventName) => {
-                window.removeEventListener(eventName, callback);
-            });
-        }
-    },
-
-    methods: {
-        onChange(e) {
-            if (this.fileApiError || this.disabled) {
-                return;
-            }
-            e.preventDefault();
-            this.processFiles(e.target.files);
-        },
-        onDrop(e) {
-            //@TODO drop folder @see https://github.com/lian-yue/vue-upload-component/blob/master/src/FileUpload.vue
-            if (this.disabled) {
-                return;
-            }
-            if (e.dataTransfer.files.length) {
-                this.processFiles(e.dataTransfer.files);
-            }
-        },
-        onPaste(e) {
-            if (this.disabled) {
-                return;
-            }
-            let files = [];
-            for (let index in e.clipboardData.items) {
-                let item = e.clipboardData.items[index];
-                if (item.kind === 'file') {
-                    files.push(item.getAsFile());
-                }
-            }
-            if (files.length) {
-                this.processFiles(files);
-            }
-        },
-        onDragEnter() {
-            isDragOver = true;
-            this.emitDragState();
-        },
-        onDragLeave() {
-            isDragOver = false;
-            this.emitDragState();
-        },
-        preventPageReload(e) {
-            e.preventDefault();
-        },
-        /**
-         * @typedef {object} FileData
-         * @property {number} id - unique file id
-         * @property {string} dataUrl - file data url
-         * @property {string} name - file name
-         * @property {number} size - file size
-         * @property {string} type - file mime-type
-         * @property {Blob} blob - file blob
-         */
-        /**
-         * @param {FileList} fileList
-         */
-        async processFiles(fileList) {
-            let count = this.multiple ? fileList.length : 1;
-            /**
-             * @type {Array<FileData>}
-             */
-            let result = [];
-            // чтение каждого файла
-            for (let i = 0; i < count; i++) {
-                let file = fileList[i];
-                if (!this.isAcceptedFile(file)) {
-                    continue;
-                }
-                // resize file if needed
-                if (file.type.match('image.*') && (this.maxWidth || this.maxHeight)) {
-                    file = await resizeImage(file, this.maxWidth, this.maxHeight);
-                }
-
-                // file have acceptable dimensions
-                const dataUrl = await this.getDataUrlFromBlob(file);
-                result[i] = {
-                    id: fileId,
-                    dataUrl,
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                    blob: file,
-                };
-                fileId += 1;
-            }
-            if (!result.length) {
-                return;
-            }
-            // передача файлов наверх
-            this.$emit(EVENT_ADD, result);
-        },
-        /**
-         * @TODO consider not exposing data url for performance purpose. Users will have to use FileReader or URL.createObjectURL() (https://twitter.com/andrey_sitnik/status/1060157747189170176)
-         * @param {File|Blob} file
-         * @return {Promise<string>} - promise resolves with dataURL
-         */
-        getDataUrlFromBlob(file) {
-            return new Promise((resolve) => {
-                let reader = new FileReader();
-                reader.onload = (event) => {
-                    resolve(event.target.result);
-                };
-                reader.readAsDataURL(file);
-            });
-        },
-        /**
-         * Проверяет, что файл соответствует принимаемым mime-type'ам
-         * @TODO нет проверки на расширение файла
-         * @param {File} file
-         * @return {boolean}
-         */
-        isAcceptedFile(file) {
-            if (!this.acceptedTypes.length) {
-                // нет ограничений на типы
-                return true;
-            }
-            return this.acceptedTypes.some((type) => file.type.indexOf(type) === 0);
-        },
-    },
-};
+/**
+ * Проверяет, что файл соответствует принимаемым mime-type'ам
+ * @TODO нет проверки на расширение файла
+ * @param {File} file
+ * @return {boolean}
+ */
+function isAcceptedFile(file) {
+    if (!acceptedTypes.value.length) {
+        // нет ограничений на типы
+        return true;
+    }
+    return acceptedTypes.value.some((type) => file.type.indexOf(type) === 0);
+}
 
 /**
  * Resize File to given dimensions
@@ -287,7 +288,6 @@ function resizeImage(file, maxWidth, maxHeight) {
                 drawImage(canvas, ctx, img, width, height, orientation, scale);
                 canvas.toBlob(resolve, file.type);
             });
-
         };
         img.src = url;
     });
@@ -334,7 +334,6 @@ function drawImage(canvas, ctx, img, width, height, orientation, scale) {
 function getOrientation(file, callback) {
     let reader = new FileReader();
     reader.onload = function(e) {
-
         let view = new DataView(e.target.result);
         if (view.getUint16(0, false) !== 0xFFD8) {
             return callback(-2);

@@ -1,3 +1,9 @@
+## 0.2.0 - wip
+- **BREAKING** change events names (remove 'on-' prefix)
+- **BREAKING** change `dist` file paths
+- add type declarations
+-
+
 ## 0.1.3 - 2024-05-06
 - Add emits and FileData type
 
