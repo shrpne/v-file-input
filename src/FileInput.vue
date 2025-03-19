@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onBeforeMount, onMounted, onUnmounted } from 'vue';
 import 'mdn-canvas-to-blob';
 import { throttle } from 'es-toolkit';
@@ -8,32 +8,24 @@ let fileId = 0;
 let isDragOver = false;
 let isDragOverEmitted = false;
 
-const props = defineProps({
-    multiple: {
-        type: Boolean,
-        default: false,
-    },
-    disabled: {
-        type: Boolean,
-        default: false,
-    },
-    accept: {
-        type: String,
-    },
-    maxWidth: {
-        type: Number,
-    },
-    maxHeight: {
-        type: Number,
-    },
-});
+type Props = {
+    multiple?: boolean;
+    disabled?: boolean;
+    accept?: string;
+    maxWidth?: number;
+    maxHeight?: number;
+};
 
-const emit = defineEmits([
-    'drag-start',
-    'drag-end',
-    'add',
-    'error',
-]);
+const props = defineProps<Props>();
+
+type EmitEvents = {
+    'drag-start': [];
+    'drag-end': [];
+    'add': [Array<FileData>];
+    'error': [];
+};
+
+const emit = defineEmits<EmitEvents>();
 
 const fileApiError = ref(false);
 
@@ -92,7 +84,7 @@ onMounted(() => {
      * @param {Array<string>} events
      * @param {Function} callback
      */
-    function addEvents(events, callback) {
+    function addEvents(events: string[], callback: (Event) => void) {
         events.forEach((eventName) => {
             window.addEventListener(eventName, callback);
         });
@@ -115,7 +107,7 @@ onUnmounted(() => {
      * @param {Array<string>} events
      * @param {Function} callback
      */
-    function removeEvents(events, callback) {
+    function removeEvents(events: string[], callback: (Event) => void) {
         events.forEach((eventName) => {
             window.removeEventListener(eventName, callback);
         });
@@ -123,7 +115,10 @@ onUnmounted(() => {
 });
 
 
-function onChange(e) {
+function onChange(e: Event) {
+    if (!(e.target instanceof HTMLInputElement)) {
+        return;
+    }
     if (fileApiError.value || props.disabled) {
         return;
     }
@@ -131,7 +126,7 @@ function onChange(e) {
     processFiles(e.target.files);
 }
 
-function onDrop(e) {
+function onDrop(e: DragEvent) {
     //@TODO drop folder @see https://github.com/lian-yue/vue-upload-component/blob/master/src/FileUpload.vue
     if (props.disabled) {
         return;
@@ -141,16 +136,19 @@ function onDrop(e) {
     }
 }
 
-function onPaste(e) {
+function onPaste(e: ClipboardEvent) {
     if (props.disabled) {
         return;
     }
     /** @type {Array<File>} */
-    let files = [];
+    let files: Array<File> = [];
     for (let index in e.clipboardData.items) {
         let item = e.clipboardData.items[index];
         if (item.kind === 'file') {
-            files.push(item.getAsFile());
+            const file = item.getAsFile();
+            if (file) {
+                files.push(file);
+            }
         }
     }
     if (files.length) {
@@ -168,48 +166,49 @@ function onDragLeave() {
     emitDragState.value();
 }
 
-function preventPageReload(e) {
+function preventPageReload(e: Event) {
     e.preventDefault();
 }
 
-/**
- * @typedef {object} FileData
- * @property {number} id - unique file id
- * @property {string} dataUrl - file data url
- * @property {string} name - file name
- * @property {number} size - file size
- * @property {string} type - file mime-type
- * @property {Blob} blob - file blob
- */
+type FileData = {
+    id: number;
+    dataUrl: string;
+    name: string;
+    size: number;
+    type: string;
+    blob: Blob;
+}
+
 /**
  * @param {FileList|Array<File>} fileList
  */
-async function processFiles(fileList) {
+async function processFiles(fileList: FileList | File[]): Promise<void> {
     let count = props.multiple ? fileList.length : 1;
     /**
      * @type {Array<FileData>}
      */
-    let result = [];
+    let result: FileData[] = [];
     // чтение каждого файла
     for (let i = 0; i < count; i++) {
         let file = fileList[i];
         if (!isAcceptedFile(file)) {
             continue;
         }
+        let blob: Blob = file;
         // resize file if needed
         if (file.type.match('image.*') && (props.maxWidth || props.maxHeight)) {
-            file = await resizeImage(file, props.maxWidth, props.maxHeight);
+            blob = await resizeImage(file, props.maxWidth, props.maxHeight);
         }
 
         // file have acceptable dimensions
-        const dataUrl = await getDataUrlFromBlob(file);
+        const dataUrl = await getDataUrlFromBlob(blob);
         result[i] = {
             id: fileId,
             dataUrl,
             name: file.name,
-            size: file.size,
-            type: file.type,
-            blob: file,
+            size: blob.size,
+            type: blob.type,
+            blob: blob,
         };
         fileId += 1;
     }
@@ -225,13 +224,27 @@ async function processFiles(fileList) {
  * @param {File|Blob} file
  * @return {Promise<string>} - promise resolves with dataURL
  */
-function getDataUrlFromBlob(file) {
-    return new Promise((resolve) => {
+function getDataUrlFromBlob(file: File | Blob): Promise<string> {
+    return readFile(file, 'DataURL');
+}
+
+function readFile(file: File | Blob, type: 'DataURL'): Promise<string>;
+function readFile(file: File | Blob, type: 'ArrayBuffer'): Promise<ArrayBuffer>;
+function readFile(file: File | Blob, type: 'ArrayBuffer' | 'DataURL'): Promise<string | ArrayBuffer> {
+    return new Promise((resolve, reject) => {
         let reader = new FileReader();
         reader.onload = (event) => {
+            // if (typeof event.target.result !== 'string') {
+            //     reject(new Error('FileReader result is not a string'));
+            // }
             resolve(event.target.result);
         };
-        reader.readAsDataURL(file);
+        reader.onerror = reject;
+        if (type === 'DataURL') {
+            reader.readAsDataURL(file);
+        } else if (type === 'ArrayBuffer') {
+            reader.readAsArrayBuffer(file);
+        }
     });
 }
 
@@ -241,7 +254,7 @@ function getDataUrlFromBlob(file) {
  * @param {File} file
  * @return {boolean}
  */
-function isAcceptedFile(file) {
+function isAcceptedFile(file: File): boolean {
     if (!acceptedTypes.value.length) {
         // нет ограничений на типы
         return true;
@@ -252,16 +265,16 @@ function isAcceptedFile(file) {
 /**
  * Resize File to given dimensions
  * @TODO consider using better resizing algorithm https://stackoverflow.com/a/24775332/4936667 or https://github.com/nodeca/pica
- * @param {File|Blob} file
+ * @param {File} file
  * @param {number} maxWidth
  * @param {number} maxHeight
  * @return {Promise<Blob>}
  */
-function resizeImage(file, maxWidth, maxHeight) {
+function resizeImage(file: File, maxWidth?: number, maxHeight?: number): Promise<Blob> {
     return new Promise((resolve) => {
         let img = new Image;
         let url = URL.createObjectURL(file);
-        img.onload = () => {
+        img.onload = async () => {
             URL.revokeObjectURL(url);
             let width = img.width;
             let height = img.height;
@@ -284,10 +297,9 @@ function resizeImage(file, maxWidth, maxHeight) {
             let canvas = document.createElement("canvas");
             let ctx = canvas.getContext("2d");
 
-            getOrientation(file, (orientation) => {
-                drawImage(canvas, ctx, img, width, height, orientation, scale);
-                canvas.toBlob(resolve, file.type);
-            });
+            const orientation = await getOrientation(file);
+            drawImage(canvas, ctx, img, width, height, orientation, scale);
+            canvas.toBlob(resolve, file.type);
         };
         img.src = url;
     });
@@ -297,7 +309,7 @@ function resizeImage(file, maxWidth, maxHeight) {
  * Draw image on canvas according to EXIF orientation data
  * https://stackoverflow.com/a/40867559/4936667
  */
-function drawImage(canvas, ctx, img, width, height, orientation, scale) {
+function drawImage(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, img: HTMLImageElement, width: number, height: number, orientation: number, scale: number) {
     // set proper canvas dimensions before transform & export
     if (4 < orientation && orientation < 9) {
         // 5-8
@@ -328,44 +340,41 @@ function drawImage(canvas, ctx, img, width, height, orientation, scale) {
 
 /**
  * https://stackoverflow.com/a/32490603/4936667
- * @param {File|Blob} file
- * @param {Function<number>} callback
  */
-function getOrientation(file, callback) {
-    let reader = new FileReader();
-    reader.onload = function(e) {
-        let view = new DataView(e.target.result);
-        if (view.getUint16(0, false) !== 0xFFD8) {
-            return callback(-2);
+async function getOrientation(file: File | Blob): Promise<number> {
+    const data = await readFile(file, 'ArrayBuffer');
+    let view = new DataView(data);
+    if (view.getUint16(0, false) !== 0xFFD8) {
+        return -2;
+    }
+    let length = view.byteLength, offset = 2;
+    while (offset < length) {
+        if (view.getUint16(offset + 2, false) <= 8) {
+            return -1;
         }
-        let length = view.byteLength, offset = 2;
-        while (offset < length) {
-            if (view.getUint16(offset + 2, false) <= 8) return callback(-1);
-            let marker = view.getUint16(offset, false);
-            offset += 2;
-            if (marker === 0xFFE1) {
-                if (view.getUint32(offset += 2, false) !== 0x45786966) {
-                    return callback(-1);
-                }
-
-                let little = view.getUint16(offset += 6, false) === 0x4949;
-                offset += view.getUint32(offset + 4, little);
-                let tags = view.getUint16(offset, little);
-                offset += 2;
-                for (let i = 0; i < tags; i++) {
-                    if (view.getUint16(offset + (i * 12), little) === 0x0112) {
-                        return callback(view.getUint16(offset + (i * 12) + 8, little));
-                    }
-                }
-            } else if ((marker & 0xFF00) !== 0xFF00) {
-                break;
-            } else {
-                offset += view.getUint16(offset, false);
+        let marker = view.getUint16(offset, false);
+        offset += 2;
+        if (marker === 0xFFE1) {
+            if (view.getUint32(offset += 2, false) !== 0x45786966) {
+                return -1;
             }
+
+            let little = view.getUint16(offset += 6, false) === 0x4949;
+            offset += view.getUint32(offset + 4, little);
+            let tags = view.getUint16(offset, little);
+            offset += 2;
+            for (let i = 0; i < tags; i++) {
+                if (view.getUint16(offset + (i * 12), little) === 0x0112) {
+                    return view.getUint16(offset + (i * 12) + 8, little);
+                }
+            }
+        } else if ((marker & 0xFF00) !== 0xFF00) {
+            break;
+        } else {
+            offset += view.getUint16(offset, false);
         }
-        return callback(-1);
-    };
-    reader.readAsArrayBuffer(file);
+    }
+    return -1;
 }
 </script>
 
