@@ -170,7 +170,7 @@ function preventPageReload(e: Event) {
     e.preventDefault();
 }
 
-type FileData = {
+export type FileData = {
     id: number;
     dataUrl: string;
     name: string;

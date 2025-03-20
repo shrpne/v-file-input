@@ -3,7 +3,7 @@
     <title>v-file-input example</title>
     <meta charset="utf-8">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3"></script>
     <script src="https://unpkg.com/v-file-input"></script>
     <!--<script src="../dist/v-file-input.js"></script>-->
 </head>
@@ -20,10 +20,10 @@
                 :disabled="isFormSending"
                 :max-width="200"
                 :max-height="200"
-                @on-add="addImages"
-                @on-error="fileApiError = true"
-                @on-drag-start="isDragLayerVisible = true"
-                @on-drag-end="isDragLayerVisible = false"
+                @add="addImages"
+                @error="fileApiError = true"
+                @drag-start="isDragLayerVisible = true"
+                @drag-end="isDragLayerVisible = false"
             ></file-input>
         </label>
     </form>
@@ -55,20 +55,22 @@
 </script>
 
 <script>
-    Vue.component('modal', modal);
-    Vue.use(VFileInput);
-
     const MAX_IMAGES_COUNT = 6;
     const MAX_IMAGES_SIZE = 10; // MB
 
-    var app = new Vue({
-        el: '#app',
-        data: {
-            images: [],
-            isFormSending: false,
-            fileError: false,
-            fileApiError: false,
-            isDragLayerVisible: false,
+    const app = Vue.createApp({
+        components: {
+            modal,
+            FileInput,
+        },
+        data() {
+            return {
+                images: [],
+                isFormSending: false,
+                fileError: false,
+                fileApiError: false,
+                isDragLayerVisible: false,
+            };
         },
         computed: {
             allowAddImages() {
@@ -113,6 +115,7 @@
             },
         }
     });
+    app.mount('#app');
 </script>
 </body>
 </html>

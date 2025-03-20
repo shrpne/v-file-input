@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/v-file-input.svg)](https://www.npmjs.com/package/v-file-input) [![vue2](https://img.shields.io/badge/vue-2.x-brightgreen.svg)](https://vuejs.org/)
 
-Simple Vue.js file input component. 
+Simple Vue.js file input component.
 
 ## Installation
 
@@ -15,13 +15,11 @@ npm install --save v-file-input
 ### Init with bundler (Webpack, Rollup)
 
 ```js
-// As plugin
-import Vue from 'vue'
-import VFileInput from 'v-file-input'
+import { createApp } from 'vue'
+import FileInput from 'v-file-input'
 
-Vue.use(VFileInput)
-
-// As component
+const app = createApp({/*...*/ });
+app.component('file-input', FileInput);
 ```
 
 ### Init in browser
@@ -45,10 +43,10 @@ Vue.use(VFileInput)
     :disabled="false"
     :max-width="200"
     :max-height="200"
-    @on-add="addFiles"
-    @on-error="showFileApiError"
-    @on-drag-start="showDragNotice"
-    @on-drag-end="hideDragNotice"
+    @add="addFiles"
+    @error="showFileApiError"
+    @drag-start="showDragNotice"
+    @drag-end="hideDragNotice"
 ></file-input>
 ```
 
@@ -62,11 +60,6 @@ Vue.use(VFileInput)
 npm run dev
 ```
 
-### Launch Karma with coverage
-
-```bash
-npm run dev:coverage
-```
 
 ### Build
 

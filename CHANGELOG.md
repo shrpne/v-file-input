@@ -1,8 +1,11 @@
-## 0.2.0 - wip
+## 0.2.1 - 2025-03-20
+- export FileData type
+
+## 0.2.0 - 2025-03-19
 - **BREAKING** change events names (remove 'on-' prefix)
 - **BREAKING** change `dist` file paths
+- **BREAKING** remove plugin, keep only component itself
 - add type declarations
--
 
 ## 0.1.3 - 2024-05-06
 - Add emits and FileData type
