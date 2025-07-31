@@ -84,7 +84,7 @@ onMounted(() => {
      * @param {Array<string>} events
      * @param {Function} callback
      */
-    function addEvents(events: string[], callback: (Event) => void) {
+    function addEvents(events: string[], callback: (e: Event) => void) {
         events.forEach((eventName) => {
             window.addEventListener(eventName, callback);
         });
@@ -107,7 +107,7 @@ onUnmounted(() => {
      * @param {Array<string>} events
      * @param {Function} callback
      */
-    function removeEvents(events: string[], callback: (Event) => void) {
+    function removeEvents(events: string[], callback: (e: Event) => void) {
         events.forEach((eventName) => {
             window.removeEventListener(eventName, callback);
         });
@@ -116,7 +116,7 @@ onUnmounted(() => {
 
 
 function onChange(e: Event) {
-    if (!(e.target instanceof HTMLInputElement)) {
+    if (!(e.target instanceof HTMLInputElement) || !e.target.files) {
         return;
     }
     if (fileApiError.value || props.disabled) {
@@ -131,13 +131,13 @@ function onDrop(e: DragEvent) {
     if (props.disabled) {
         return;
     }
-    if (e.dataTransfer.files.length) {
+    if (e.dataTransfer?.files.length) {
         processFiles(e.dataTransfer.files);
     }
 }
 
 function onPaste(e: ClipboardEvent) {
-    if (props.disabled) {
+    if (props.disabled || !e.clipboardData) {
         return;
     }
     /** @type {Array<File>} */
@@ -197,7 +197,10 @@ async function processFiles(fileList: FileList | File[]): Promise<void> {
         let blob: Blob = file;
         // resize file if needed
         if (file.type.match('image.*') && (props.maxWidth || props.maxHeight)) {
-            blob = await resizeImage(file, props.maxWidth, props.maxHeight);
+            const resized = await resizeImage(file, props.maxWidth, props.maxHeight);
+            if (resized) {
+                blob = resized;
+            }
         }
 
         // file have acceptable dimensions
@@ -234,6 +237,9 @@ function readFile(file: File | Blob, type: 'ArrayBuffer' | 'DataURL'): Promise<s
     return new Promise((resolve, reject) => {
         let reader = new FileReader();
         reader.onload = (event) => {
+            if (!event.target?.result) {
+                return reject(new Error('FileReader onload result is null'));
+            }
             // if (typeof event.target.result !== 'string') {
             //     reject(new Error('FileReader result is not a string'));
             // }
@@ -270,7 +276,7 @@ function isAcceptedFile(file: File): boolean {
  * @param {number} maxHeight
  * @return {Promise<Blob>}
  */
-function resizeImage(file: File, maxWidth?: number, maxHeight?: number): Promise<Blob> {
+function resizeImage(file: File, maxWidth?: number, maxHeight?: number): Promise<Blob|null> {
     return new Promise((resolve) => {
         let img = new Image;
         let url = URL.createObjectURL(file);
@@ -281,11 +287,11 @@ function resizeImage(file: File, maxWidth?: number, maxHeight?: number): Promise
 
             let scale = 1;
             if (width > height) {
-                if (width > maxWidth) {
+                if (maxWidth && width > maxWidth) {
                     scale = maxWidth / width;
                 }
             } else {
-                if (height > maxHeight) {
+                if (maxHeight && height > maxHeight) {
                     scale = maxHeight / height;
                 }
             }
@@ -296,6 +302,10 @@ function resizeImage(file: File, maxWidth?: number, maxHeight?: number): Promise
 
             let canvas = document.createElement("canvas");
             let ctx = canvas.getContext("2d");
+            if (!ctx) {
+                resolve(null);
+                return;
+            }
 
             const orientation = await getOrientation(file);
             drawImage(canvas, ctx, img, width, height, orientation, scale);

@@ -1,6 +1,6 @@
 {
   "name": "v-file-input",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Simple file input component for Vue.js",
   "author": "shrpne <shrpne@gmail.com>",
   "type": "module",
@@ -22,6 +22,8 @@
     "test:vitest": "vitest run",
     "lint": "eslint . --no-error-on-unmatched-pattern --no-warn-ignored",
     "lint:fix": "npm run lint -- --fix",
+    "lint:publint": "npx --yes publint",
+    "lint:are-the-types-wrong": "npx --yes @arethetypeswrong/cli --pack .",
     "prepublishOnly": "npm run test && npm run emit-dts && npm run build",
     "precommit": "echo 'Pre-commit checks...' && npm run lint"
   },
