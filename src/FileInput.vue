@@ -296,18 +296,21 @@ function resizeImage(file: File, maxWidth?: number, maxHeight?: number): Promise
                 }
             }
             if (scale === 1) {
-                resolve(file);
-                return;
+                return resolve(file);
             }
 
             let canvas = document.createElement("canvas");
             let ctx = canvas.getContext("2d");
             if (!ctx) {
-                resolve(null);
-                return;
+                return resolve(null);
             }
 
-            const orientation = await getOrientation(file);
+            let orientation: number;
+            try {
+                orientation = await getOrientation(file);
+            } catch (e) {
+                return resolve(null);
+            }
             drawImage(canvas, ctx, img, width, height, orientation, scale);
             canvas.toBlob(resolve, file.type);
         };
