@@ -9,7 +9,7 @@
       "ESNext",
       "ESNext.AsyncIterable",
       "DOM",
-      "DOM.Iterable",
+      "DOM.Iterable"
     ],
     "esModuleInterop": true,
     "allowJs": true,
@@ -24,6 +24,7 @@
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
     "noEmit": true,
     "declaration": true,
     "declarationDir": "./types",
