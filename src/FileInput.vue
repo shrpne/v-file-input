@@ -124,6 +124,9 @@ function onChange(e: Event) {
     }
     e.preventDefault();
     processFiles(e.target.files);
+
+    // Clear the input so that Chrome can detect file selection when the same file is repeatedly selected
+    e.target.value = '';
 }
 
 function onDrop(e: DragEvent) {
