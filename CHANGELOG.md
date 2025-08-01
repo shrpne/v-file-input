@@ -1,3 +1,6 @@
+## 0.2.5 - 2025-08-01
+- fix: edge cases
+
 ## 0.2.4 - 2025-08-91
 - fix: selecting same file in Chrome
 

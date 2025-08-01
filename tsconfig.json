@@ -15,8 +15,14 @@
     "allowJs": true,
     "checkJs": true,
 //    "sourceMap": true,
+
+    /* Strictness */
     "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+
     "allowImportingTsExtensions": true,
+    "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "declaration": true,

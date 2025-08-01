@@ -147,7 +147,7 @@ function onPaste(e: ClipboardEvent) {
     let files: Array<File> = [];
     for (let index in e.clipboardData.items) {
         let item = e.clipboardData.items[index];
-        if (item.kind === 'file') {
+        if (item && item.kind === 'file') {
             const file = item.getAsFile();
             if (file) {
                 files.push(file);
@@ -186,7 +186,7 @@ export type FileData = {
  * @param {FileList|Array<File>} fileList
  */
 async function processFiles(fileList: FileList | File[]): Promise<void> {
-    let count = props.multiple ? fileList.length : 1;
+    let count = props.multiple ? fileList.length : Math.min(1, fileList.length);
     /**
      * @type {Array<FileData>}
      */
@@ -194,7 +194,7 @@ async function processFiles(fileList: FileList | File[]): Promise<void> {
     // чтение каждого файла
     for (let i = 0; i < count; i++) {
         let file = fileList[i];
-        if (!isAcceptedFile(file)) {
+        if (!file || !isAcceptedFile(file)) {
             continue;
         }
         let blob: Blob = file;
